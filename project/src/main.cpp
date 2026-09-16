@@ -1,24 +1,49 @@
-// Каркас агента: читает журнал событий построчно и считает строки.
-//
-// Это заготовка занятия 1.1, а не решение. Детектов она не ищет — их вы
-// добавите здесь же, в отмеченном месте ниже. Формат строки детекта, список
-// признаков и правило про их порядок заданы в постановке занятия: по ним
-// сравниваются эталоны.
-//
-// Весь код лежит в main, и на этом занятии так и надо: функции появятся
-// на занятии 1.2, ссылки — на 1.3. Разбор аргументов, коды возврата и флаг
-// --quiet — часть задания.
-//
-// Запуск:
-//   nano-edr <журнал.log>
-#include <cstdio>
+#include <charconv>
+#include <cstring>
 #include <fstream>
 #include <print>
 #include <string>
+#include <vector>
+
+#include "event_list.h"
+#include "parse.h"
+
+void Context (const nano_edr::EventList* list){
+    nano_edr::EventNode* cntx1 = nullptr;
+    nano_edr::EventNode* cntx2 = nullptr;
+    nano_edr::EventNode* head = list->head;
+    if (list -> size == 0){
+        return;
+    }
+    if (list -> size == 1){
+        nano_edr::Event* head1 = &head->event;
+        std::print("[CTX] -1: ts={} type={} pid={}\n",head1->ts, head1->type, head1->pid);
+        return;
+    }
+    cntx1 = head -> next;
+    cntx2 = head;
+    while (cntx1->next){
+        cntx2 = cntx1;
+        cntx1 = cntx1 -> next;
+    }
+    std::print("[CTX] -2: ts={} type={} pid={}\n",cntx2->event.ts, cntx2->event.type, cntx2->event.pid);
+    std::print("[CTX] -1: ts={} type={} pid={}\n",cntx1->event.ts, cntx1->event.type, cntx1->event.pid);
+    return;
+}
+
+void Typecnt (const std::string& type, std::vector<std::string>& names, std::vector<long long>& counts){
+    for (std::size_t i = 0; i < names.size(); ++i) {
+        if (names[i] == type) {
+            ++counts[i];
+            return;
+        }
+    }
+    names.push_back(type);
+    counts.push_back(1);
+}
 
 int main(int argc, char** argv) {
-    // Аргументы разбираются грубо: путь к журналу и ничего больше. Остальное,
-    // включая --quiet, добавляется по заданию.
+    nano_edr::EventList list;
     if (argc < 2) {
         std::print(stderr, "использование: nano-edr <журнал.log>\n");
         return 2;
@@ -29,30 +54,75 @@ int main(int argc, char** argv) {
         std::print(stderr, "не удалось открыть журнал: {}\n", argv[1]);
         return 2;
     }
-
-    long long lines = 0;
-    long long comments = 0;
-    std::string line;
-
-    while (std::getline(log, line)) {
-        // Счётчик увеличивается до всех проверок: он считает строки файла,
-        // а не события. Номер, посчитанный по событиям, бесполезен — по нему
-        // нельзя открыть файл и посмотреть.
-        ++lines;
-
-        // Строки-комментарии в журнале начинаются с '#'. Они не события,
-        // и детекта по ним быть не должно.
-        if (!line.empty() && line[0] == '#') {
-            ++comments;
+    bool quiet = false;
+    size_t window_size = 64;
+    for (int i = 0; i < argc; i++){
+        std::string arg = std::string(argv [i]);
+        if (arg == "--quiet"){
+            quiet = true;
             continue;
         }
+        if(arg == "--window-size"){
+            if (i + 1 == argc){
+                std::print(stderr, "использование: nano-edr <журнал.log> <--window-size> <N>\n");
+                return 2;
+            }
+            i++;
+            std::string s = argv[i];
+            size_t n=0;
+            auto [ptr, ec] = std::from_chars(s.data(), s.data() + s.size(), n);
+            window_size = n;
+        }
 
-        // >>> Здесь начинается занятие 1.1.
-        //
-        // Проверка признаков и печать детекта. Номер строки, который нужен
-        // в выводе, — это lines.
+    }
+    list.capacity = window_size;
+
+    long long lines = 0;
+    long long events = 0;
+    long long comments = 0;
+    std::vector<std::string> type_names;
+    std::vector<long long>   type_counts;
+    std::string line;
+
+    const std::vector<std::string> signs = {
+        "wscript.exe",
+        ".locked",
+        "certutil.exe",
+        "\\Startup\\",
+    };
+
+    while (std::getline(log, line)) {
+        nano_edr::Event event;
+        ++lines;
+        if (nano_edr::IsBlankOrComment(&line)){
+            comments++;
+            continue;
+        }
+        if (!nano_edr::ParseEventLine(&line, &event)){
+            continue;
+        }
+        events++;
+        
+        Typecnt(event.type, type_names, type_counts);
+
+        bool detect = false;
+        for (const std::string& sign : signs) {
+            if (line.find(sign) != std::string::npos) {
+                std::print("[DETECT] строка {}, признак {}: {}\n",lines, sign, line);
+                detect = true;
+            }
+        }
+        if(detect && !quiet){
+            Context(&list);
+        }
+        nano_edr::ListPushBack(&list, &event);
     }
 
-    std::print("строк {}, из них комментариев {}\n", lines, comments);
+    if (!quiet) {
+        std::print("строк {}, из них комментариев {}, событий {}\n", lines, comments, events);
+        for (std::size_t j = 0; j < type_names.size(); ++j) {
+            std::print("  {}: {}\n", type_names[j], type_counts[j]);
+        }
+    }
     return 0;
 }
