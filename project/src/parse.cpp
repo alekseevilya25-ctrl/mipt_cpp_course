@@ -3,6 +3,11 @@
 namespace nano_edr {
 const char* ws = " \t";
 
+bool Valid (const std::string& s, size_t n, size_t i){
+    return (i < n && s[i] !=' ' && s[i] != '\t');
+}
+
+
 bool  IsBlankOrComment(const std::string* line) {
     if (line->empty()){
         return true;
@@ -18,10 +23,10 @@ bool  IsBlankOrComment(const std::string* line) {
 bool ParseEventLine(const std::string* line, Event* out){
     if (IsBlankOrComment (line)) return false;
 
-    std::vector <Field> fields;
-    std::string ts;    
-    std::string type;
-    std::string pid;
+    std::vector <Field>& fields = out->fields;
+    std::string& ts = out->ts;    
+    std::string& type = out->type;
+    std::string& pid = out->pid;
 
     bool ts_ok = false;
     bool type_ok = false;
@@ -29,7 +34,7 @@ bool ParseEventLine(const std::string* line, Event* out){
 
     size_t n = (*line).size();
 
-    std::size_t i = 0;
+    size_t i = 0;
 
     const std::string& s = (*line);
 
@@ -39,7 +44,7 @@ bool ParseEventLine(const std::string* line, Event* out){
             break;
         }
         size_t start = i;
-        while (s[i] != '=' && s[i] != ' ' && i < n &&  s[i] != '\t'){
+        while (Valid(s, n, i) && (s[i] != '=')){
             i++;
         }
         if (i == n || s[i] != '=' || i == start){
@@ -47,7 +52,7 @@ bool ParseEventLine(const std::string* line, Event* out){
         }
 
         std::string key = s.substr(start, i - start);
-        std::string value = "";
+        std::string value;
         i++;
 
         if (i < n && s[i] == '"' ){
@@ -62,14 +67,14 @@ bool ParseEventLine(const std::string* line, Event* out){
 
             value = s.substr(start, i - start);
             i++;
-            if (i < n && s[i] != ' ' && s[i] != '\t'){
+            if (Valid(s, n, i)){
                 return false;
             }
         }
         else{
             if(i < n){
                 start = i;
-                while(i < n && s[i] !=' ' && s[i] != '\t'){
+                while(Valid(s, n, i)){
                     i++;
                 }
                 value = s.substr(start, i - start);
@@ -80,7 +85,7 @@ bool ParseEventLine(const std::string* line, Event* out){
             ts_ok = true;
             continue;
         }
-        if(key == "type" && !type_ok){
+        if(key == "type" && !type_ok){ 
             type = value;
             type_ok = true;
             continue;
@@ -95,13 +100,12 @@ bool ParseEventLine(const std::string* line, Event* out){
         k.value = value;
         fields.push_back(k);
     }
-    if(!ts_ok || !type_ok){
+    if(!ts_ok || !type_ok){ 
         return false;
     }
-    out -> fields = fields;
-    out -> ts = ts;
-    out -> type = type;
-    out -> pid = pid;
+    if (ts.empty() || type.empty()){
+        return false;
+    }
     return true;
 }
 }

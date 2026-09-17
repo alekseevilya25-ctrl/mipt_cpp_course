@@ -44,38 +44,48 @@ void Typecnt (const std::string& type, std::vector<std::string>& names, std::vec
 
 int main(int argc, char** argv) {
     nano_edr::EventList list;
+
     if (argc < 2) {
-        std::print(stderr, "использование: nano-edr <журнал.log>\n");
+        std::print(stderr, "использование: nano-edr <журнал.log> [--quiet] [--window-size N]\n");
         return 2;
     }
 
-    std::ifstream log(argv[1]);
-    if (!log) {
-        std::print(stderr, "не удалось открыть журнал: {}\n", argv[1]);
-        return 2;
-    }
     bool quiet = false;
     size_t window_size = 64;
-    for (int i = 0; i < argc; i++){
+    std::string path;
+
+    for (int i = 1; i < argc; i++){
         std::string arg = std::string(argv [i]);
         if (arg == "--quiet"){
             quiet = true;
             continue;
         }
-        if(arg == "--window-size"){
+        else if(arg == "--window-size"){
             if (i + 1 == argc){
-                std::print(stderr, "использование: nano-edr <журнал.log> <--window-size> <N>\n");
+                std::print(stderr, "использование: nano-edr [--quiet] [--window-size N]\n <N>\n");
                 return 2;
             }
             i++;
             std::string s = argv[i];
-            size_t n=0;
+            size_t n = 0;
             auto [ptr, ec] = std::from_chars(s.data(), s.data() + s.size(), n);
+            if (ec != std::errc{} || ptr != s.data() + s.size()) {
+                std::print(stderr, "неверное значение: {}\n", s);
+                return 2;
+            }
             window_size = n;
+        }
+        else if (path.empty()) {
+            path = arg;
         }
 
     }
     list.capacity = window_size;
+
+    if (path.empty()) {
+        std::print(stderr, "использование: nano-edr <журнал.log> [--quiet] [--window-size N]\n");
+        return 2;
+    }
 
     long long lines = 0;
     long long events = 0;
@@ -90,6 +100,18 @@ int main(int argc, char** argv) {
         "certutil.exe",
         "\\Startup\\",
     };
+
+    std::ifstream log(path);
+
+    if (!log) {
+        std::print(stderr, "не удалось открыть журнал: {}\n", path);
+        return 2;
+    }
+
+    nano_edr::Event cntx2;   // предпоследнее
+    nano_edr::Event cntx1;   // последнее
+    bool cntx2_valid = false;
+    bool cntx1_valid = false;
 
     while (std::getline(log, line)) {
         nano_edr::Event event;
@@ -113,8 +135,20 @@ int main(int argc, char** argv) {
             }
         }
         if(detect && !quiet){
-            Context(&list);
+            std::size_t max_cntx = (list.capacity == 1) ? 1 : 2;
+            if (max_cntx >= 2 && cntx2_valid) {
+                std::print("[CTX] -2: ts={} type={} pid={}\n", cntx2.ts, cntx2.type, cntx2.pid);
+            }
+            if (max_cntx >= 1 && cntx1_valid) {
+                std::print("[CTX] -1: ts={} type={} pid={}\n", cntx1.ts, cntx1.type, cntx1.pid);
+            }
         }
+
+        cntx2 = cntx1;
+        cntx2_valid = cntx1_valid;
+        cntx1 = event;
+        cntx1_valid = true;
+
         nano_edr::ListPushBack(&list, &event);
     }
 
