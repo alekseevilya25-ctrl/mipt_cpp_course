@@ -9,26 +9,18 @@
 #include "parse.h"
 
 void Context (const nano_edr::EventList* list){
-    nano_edr::EventNode* cntx1 = nullptr;
-    nano_edr::EventNode* cntx2 = nullptr;
-    nano_edr::EventNode* head = list->head;
     if (list -> size == 0){
         return;
     }
-    if (list -> size == 1){
-        nano_edr::Event* head1 = &head->event;
-        std::print("[CTX] -1: ts={} type={} pid={}\n",head1->ts, head1->type, head1->pid);
-        return;
+    size_t max_cntx = (list -> capacity == 1) ? 1 : 2;
+
+    if (max_cntx >= 2 && list -> prev_tail != nullptr) {
+        const nano_edr::Event& prev = list -> prev_tail -> event;
+        std::print("[CTX] -2: ts={} type={} pid={}\n", prev.ts, prev.type, prev.pid);
     }
-    cntx1 = head -> next;
-    cntx2 = head;
-    while (cntx1->next){
-        cntx2 = cntx1;
-        cntx1 = cntx1 -> next;
-    }
-    std::print("[CTX] -2: ts={} type={} pid={}\n",cntx2->event.ts, cntx2->event.type, cntx2->event.pid);
-    std::print("[CTX] -1: ts={} type={} pid={}\n",cntx1->event.ts, cntx1->event.type, cntx1->event.pid);
-    return;
+
+    const nano_edr::Event& tail = list -> tail -> event;
+    std::print("[CTX] -1: ts={} type={} pid={}\n", tail.ts, tail.type, tail.pid);
 }
 
 void Typecnt (const std::string& type, std::vector<std::string>& names, std::vector<long long>& counts){
@@ -42,13 +34,11 @@ void Typecnt (const std::string& type, std::vector<std::string>& names, std::vec
     counts.push_back(1);
 }
 
+void Error(){
+    std::print(stderr, "использование: nano-edr <журнал.log> [--quiet] [--window-size N]\n");
+}
 int main(int argc, char** argv) {
     nano_edr::EventList list;
-
-    if (argc < 2) {
-        std::print(stderr, "использование: nano-edr <журнал.log> [--quiet] [--window-size N]\n");
-        return 2;
-    }
 
     bool quiet = false;
     size_t window_size = 64;
@@ -58,11 +48,10 @@ int main(int argc, char** argv) {
         std::string arg = std::string(argv [i]);
         if (arg == "--quiet"){
             quiet = true;
-            continue;
         }
         else if(arg == "--window-size"){
             if (i + 1 == argc){
-                std::print(stderr, "использование: nano-edr [--quiet] [--window-size N]\n <N>\n");
+                Error();
                 return 2;
             }
             i++;
@@ -83,7 +72,7 @@ int main(int argc, char** argv) {
     list.capacity = window_size;
 
     if (path.empty()) {
-        std::print(stderr, "использование: nano-edr <журнал.log> [--quiet] [--window-size N]\n");
+        Error();
         return 2;
     }
 
@@ -108,11 +97,6 @@ int main(int argc, char** argv) {
         return 2;
     }
 
-    nano_edr::Event cntx2;   // предпоследнее
-    nano_edr::Event cntx1;   // последнее
-    bool cntx2_valid = false;
-    bool cntx1_valid = false;
-
     while (std::getline(log, line)) {
         nano_edr::Event event;
         ++lines;
@@ -135,19 +119,8 @@ int main(int argc, char** argv) {
             }
         }
         if(detect && !quiet){
-            std::size_t max_cntx = (list.capacity == 1) ? 1 : 2;
-            if (max_cntx >= 2 && cntx2_valid) {
-                std::print("[CTX] -2: ts={} type={} pid={}\n", cntx2.ts, cntx2.type, cntx2.pid);
-            }
-            if (max_cntx >= 1 && cntx1_valid) {
-                std::print("[CTX] -1: ts={} type={} pid={}\n", cntx1.ts, cntx1.type, cntx1.pid);
-            }
+            Context(&list);
         }
-
-        cntx2 = cntx1;
-        cntx2_valid = cntx1_valid;
-        cntx1 = event;
-        cntx1_valid = true;
 
         nano_edr::ListPushBack(&list, &event);
     }
