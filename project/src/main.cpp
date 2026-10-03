@@ -12,6 +12,21 @@
 #include "agent_rules.h"
 
 
+void Context(nano_edr::EventNode* ctx){
+    if(!ctx){
+        return;
+    }
+    int i = 1;
+    if(ctx -> next){
+        i++;
+    }
+    while(ctx){
+        std::print("[CTX] -{}: ts={}  type={} pid={}\n", i, ctx->event.ts, ctx->event.type, ctx->event.pid);
+        i--;
+        ctx = ctx->next;
+    }
+}
+
 void Typecnt (const std::string& type, std::vector<std::string>& names, std::vector<long long>& counts){
     for (std::size_t i = 0; i < names.size(); ++i) {
         if (names[i] == type) {
@@ -87,6 +102,8 @@ int main(int argc, char** argv) {
         std::print(stderr, "не удалось открыть журнал: {}\n", path);
         return 2;
     }
+    nano_edr::EventNode* ctx = nullptr;
+
     while (std::getline(log, line)) {
         nano_edr::Event event;
         ++lines;
@@ -100,7 +117,17 @@ int main(int argc, char** argv) {
         events++;
         
         Typecnt(event.type, type_names, type_counts);
-        nano_edr::CheckRules(event, nano_edr::AgentRules(), nano_edr::AgentRuleCount());
+        int n = nano_edr::CheckRules(event, nano_edr::AgentRules(), nano_edr::AgentRuleCount());
+        if (n >= 1){
+            Context(ctx);
+        }
+        nano_edr::ListPushBack(&list, &event);
+        if(list.size <= 2){
+            ctx = list.head;
+        }
+        else{
+            ctx = ctx->next;
+        }
     }
 
     if (!quiet) {
