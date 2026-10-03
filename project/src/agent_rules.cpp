@@ -6,20 +6,13 @@ bool StrContains(const std::string& s, const std::string& needle){
     const std::string* cmd = &s;
     std::string cmd_ = NormalizePath(*cmd);
     std::string needle_ = NormalizePath(needle);
-    if (cmd_.find(needle_) != std::string::npos){
-        return true;
-    }
-    else{
-        return false;
-    }
+    return cmd_.find(needle_) != std::string::npos;
 }
 bool IsFileCreate(const Event& event){
-    if (event.type == "file_create") return true;
-    return false;
+    return event.type == "file_create";
 }
 bool IsFileMove(const Event& event){
-    if (event.type == "file_move") return true;
-    return false;
+    return event.type == "file_move";
 }
 bool StrEndsWith(const std::string& s, const std::string& suffix){
     const std::string* path = &s;
@@ -29,10 +22,7 @@ bool StrEndsWith(const std::string& s, const std::string& suffix){
         return false;
     }
     size_t pos = npath.size() - nsuffix.size();
-    if (npath.find(nsuffix, pos) == pos){
-       return true;
-    }
-    return false;
+    return npath.find(nsuffix, pos) == pos;
 }
 
 

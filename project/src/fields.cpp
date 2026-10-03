@@ -43,29 +43,28 @@ uint64_t GetIntField(const Event& event, const std::string& key, uint64_t fallba
     return out;
 }
 bool IsProcessStart(const Event& event){
-    if (event.type == "process_start") return true;
-    return false;
+    return event.type == "process_start";
 }
 bool IsFileWrite(const Event& event){
-    if (event.type == "file_write") return true;
-    return false;
+    return event.type == "file_write";
 }
 bool IsNetConnect(const Event& event){
-    if (event.type == "net_connect") return true;
-    return false;
+    return event.type == "net_connect";
 }
 std::string NormalizePath(const std::string& path){
-    std::string str = path;
-
-    for (char& c : str){
-        if (c >= 'A' && c <='Z'){
-            c += 32;
+    std::string str;
+    for (size_t i = 0; i < path.size(); i++){
+        if (path[i] >= 'A' && path[i] <='Z'){
+            str += (path[i] + 32);
+            continue;
         }
-    }
-    for (char& c : str){
-        if (c == '/'){
-            c = '\\';
+        if (path[i] == '/' || path[i] == '\\'){
+            if(i == 0 || (i > 0 && path[i - 1] != '\\')){
+                str += "\\";
+            }
+            continue;
         }
+        str += path[i];
     }
     size_t pos = str.find("%temp%");
     while (pos != std::string::npos){
@@ -77,15 +76,7 @@ std::string NormalizePath(const std::string& path){
         str.replace(pos, 5, "\\appdata\\local\\temp");
         pos = str.find("%tmp%");
     }
-    std::string norm;
-    size_t n = str.size();
-    for (size_t i = 0; i < n; i++){
-        if(i < n - 1 && str[i] == '\\' && str[i + 1] == '\\'){
-            continue;
-        }
-        norm += str[i];
-    }
-    return norm;
+    return str;
 }
 bool PathEndsWith(const Event& event, const std::string& suffix){
     const std::string* path = FindField(event, "path");
@@ -98,10 +89,7 @@ bool PathEndsWith(const Event& event, const std::string& suffix){
         return false;
     }
     size_t pos = npath.size() - nsuffix.size();
-    if (npath.find(nsuffix, pos) == pos){
-       return true;
-    }
-    return false;
+    return npath.find(nsuffix, pos) == pos;
 }
 
 bool CommandLineContains(const Event& event, const std::string& needle){
@@ -111,11 +99,6 @@ bool CommandLineContains(const Event& event, const std::string& needle){
     }
     std::string cmd_ = NormalizePath(*cmd);
     std::string needle_ = NormalizePath(needle);
-    if (cmd_.find(needle_) != std::string::npos){
-        return true;
-    }
-    else{
-        return false;
-    }
+    return cmd_.find(needle_) != std::string::npos;
 }
 }
