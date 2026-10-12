@@ -9,10 +9,10 @@ bool StrContains(const std::string& s, const std::string& needle){
     return cmd_.find(needle_) != std::string::npos;
 }
 bool IsFileCreate(const Event& event){
-    return event.type == "file_create";
+    return event.type() == "file_create";
 }
 bool IsFileMove(const Event& event){
-    return event.type == "file_move";
+    return event.type() == "file_move";
 }
 bool StrEndsWith(const std::string& s, const std::string& suffix){
     const std::string* path = &s;
