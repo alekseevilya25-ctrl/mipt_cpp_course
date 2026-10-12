@@ -8,19 +8,19 @@ bool Valid (const std::string& s, size_t n, size_t i){
 }
 
 
-bool  IsBlankOrComment(const std::string* line) {
-    if (line->empty()){
+bool  IsBlankOrComment(const std::string& line) {
+    if (line.empty()){
         return true;
     }
 
-    size_t pos = line -> find_first_not_of(ws);
+    size_t pos = line.find_first_not_of(ws);
     if (pos == std::string::npos) {
         return true;
     }
 
-    return (*line)[pos] == '#' || (*line)[pos] == ';';
+    return (line)[pos] == '#' || (line)[pos] == ';';
 }
-bool ParseEventLine(const std::string* line, Event* out){
+bool ParseEventParts(const std::string& line, EventParts* out){
     if (IsBlankOrComment (line)) return false;
 
     std::vector <Field>& fields = out->fields;
@@ -32,11 +32,11 @@ bool ParseEventLine(const std::string* line, Event* out){
     bool type_ok = false;
     bool pid_ok = false;
 
-    size_t n = (*line).size();
+    size_t n = (line).size();
 
     size_t i = 0;
 
-    const std::string& s = (*line);
+    const std::string& s = (line);
 
     while (i < n){
         i = s.find_first_not_of(ws, i);
@@ -99,12 +99,6 @@ bool ParseEventLine(const std::string* line, Event* out){
         k.key = key;
         k.value = value;
         fields.push_back(k);
-    }
-    if(!ts_ok || !type_ok){ 
-        return false;
-    }
-    if (ts.empty() || type.empty()){
-        return false;
     }
     return true;
 }

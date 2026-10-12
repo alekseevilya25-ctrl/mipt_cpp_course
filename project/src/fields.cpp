@@ -5,7 +5,16 @@ namespace nano_edr{
 // nullptr, а не исключение: у file_write нет поля domain, и спрашивать
 // про него законно.
 const std::string* FindField(const Event& event, const std::string& key){
-    for (auto& field: event.fields){
+    if (key == "ts"){
+        return &event.raw_ts();
+    }
+    if (key == "pid"){
+        return &event.pid();
+    }
+    if (key == "type"){
+        return &event.type();
+    }
+    for (auto& field: event.fields()){
         if (field.key == key){
             return &field.value;
         }
@@ -43,13 +52,13 @@ uint64_t GetIntField(const Event& event, const std::string& key, uint64_t fallba
     return out;
 }
 bool IsProcessStart(const Event& event){
-    return event.type == "process_start";
+    return event.type() == "process_start";
 }
 bool IsFileWrite(const Event& event){
-    return event.type == "file_write";
+    return event.type() == "file_write";
 }
 bool IsNetConnect(const Event& event){
-    return event.type == "net_connect";
+    return event.type() == "net_connect";
 }
 std::string NormalizePath(const std::string& path){
     std::string str;
