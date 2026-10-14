@@ -1,115 +1,58 @@
 #include "agent_rules.h"
-#include "fields.h"
+
 namespace nano_edr{
 
-bool StrContains(const std::string& s, const std::string& needle){
-    const std::string* cmd = &s;
-    std::string cmd_ = NormalizePath(*cmd);
-    std::string needle_ = NormalizePath(needle);
-    return cmd_.find(needle_) != std::string::npos;
-}
-bool IsFileCreate(const Event& event){
-    return event.type() == "file_create";
-}
-bool IsFileMove(const Event& event){
-    return event.type() == "file_move";
-}
-bool StrEndsWith(const std::string& s, const std::string& suffix){
-    const std::string* path = &s;
-    std::string npath = NormalizePath(*path);
-    std::string nsuffix = NormalizePath(suffix);
-    if (nsuffix.size() > npath.size()){
-        return false;
-    }
-    size_t pos = npath.size() - nsuffix.size();
-    return npath.find(nsuffix, pos) == pos;
+std::vector<MatchRule> BuildAgentRules(){
+    std::vector<MatchRule> rules;
+    MatchRule ransom_by_path("ransom_extension", Severity::kCritical);
+    ransom_by_path.AddCondition(Condition::Equals("type", {"file_create", "file_write"}));
+    ransom_by_path.AddCondition(Condition::EndsWith("path", {".locked"}));
+    ransom_by_path.AddAction("quarantine_file");
+    rules.push_back(ransom_by_path);
+
+    MatchRule ransom_by_to("ransom_extension", Severity::kCritical);
+    ransom_by_to.AddCondition(Condition::Equals("type", {"file_move"}));
+    ransom_by_to.AddCondition(Condition::EndsWith("to", {".locked"}));
+    ransom_by_to.AddAction("quarantine_file");
+    rules.push_back(ransom_by_to);
+
+    MatchRule script_host_from_temp("script_host_from_temp", Severity::kHigh);
+    script_host_from_temp.AddCondition(Condition::Equals("type", {"process_start"}));
+    script_host_from_temp.AddCondition(Condition::EndsWith("image", {"wscript.exe", "cscript.exe"}));
+    script_host_from_temp.AddCondition(Condition::Contains("cmdline", {
+        "\\appdata\\local\\temp\\", "/appdata/local/temp/",
+        "\\windows\\temp\\", "/windows/temp/",
+        "%temp%", "%tmp%"}));
+    script_host_from_temp.AddAction("kill_process");
+    rules.push_back(script_host_from_temp);
+
+    MatchRule lolbin_download("lolbin_download", Severity::kHigh);
+    lolbin_download.AddCondition(Condition::Equals("type", {"process_start"}));
+    lolbin_download.AddCondition(Condition::EndsWith("image", {"certutil.exe", "bitsadmin.exe"}));
+    lolbin_download.AddCondition(Condition::Contains("cmdline", {"transfer", "http:", "urlcache", "https:"}));
+    lolbin_download.AddAction("kill_process");
+    rules.push_back(lolbin_download);
+
+    MatchRule hidden_powershell("hidden_powershell", Severity::kMedium);
+    hidden_powershell.AddCondition(Condition::Equals("type", {"process_start"}));
+    hidden_powershell.AddCondition(Condition::EndsWith("image", {"powershell.exe", "pwsh.exe"}));
+    hidden_powershell.AddCondition(Condition::Contains("cmdline", {"-w hidden", "-windowstyle hidden", "-enc", "-encodedcommand"}));
+    hidden_powershell.AddAction("kill_process");
+    rules.push_back(hidden_powershell);
+
+    MatchRule autostart_by_path("autostart_write", Severity::kHigh);
+    autostart_by_path.AddCondition(Condition::Equals("type", {"file_create", "file_write"}));
+    autostart_by_path.AddCondition(Condition::Contains("path", {"\\start menu\\programs\\startup\\", "/start menu/programs/startup/"}));
+    autostart_by_path.AddAction("quarantine_file");
+    rules.push_back(autostart_by_path);
+
+    MatchRule autostart_by_to("autostart_write", Severity::kHigh);
+    autostart_by_to.AddCondition(Condition::Equals("type", {"file_move"}));
+    autostart_by_to.AddCondition(Condition::Contains("to", {"\\start menu\\programs\\startup\\", "/start menu/programs/startup/"}));
+    autostart_by_to.AddAction("quarantine_file");
+    rules.push_back(autostart_by_to);
+
+    return rules;
 }
 
-
-bool ScriptHostFromTemp(const Event& event){
-    if (!IsProcessStart(event)){
-        return false;
-    }
-    const std::string& s = GetRequiredField(event, "image");
-    if (StrEndsWith(s, "wscript.exe") || StrEndsWith(s, "cscript.exe")){
-        if (CommandLineContains(event, "\\appdata\\local\\temp\\") || CommandLineContains(event, "\\windows\\temp\\")) {
-            return true;
-        }
-        return false;
-    }
-    return false;
-}
-bool LolbinDownload(const Event& event){
-    if (!IsProcessStart(event)){
-        return false;
-    }
-    const std::string& s = GetRequiredField(event, "image");
-    if (StrEndsWith(s, "certutil.exe") || StrEndsWith(s, "bitsadmin.exe")){
-        if (CommandLineContains(event, "transfer") || CommandLineContains(event, "http:") || CommandLineContains(event, "urlcache") || CommandLineContains(event, "https:")) {
-            return true;
-        }
-        return false;
-    }
-    return false;
-}
-bool HiddenPowershell(const Event& event){
-    if (!IsProcessStart(event)){
-        return false;
-    }
-    const std::string& s = GetRequiredField(event, "image");
-    if (StrEndsWith(s, "powershell.exe") || StrEndsWith(s, "pwsh.exe")){
-        if (CommandLineContains(event, "-w hidden") || CommandLineContains(event, "-windowstyle hidden") || CommandLineContains(event, "-enc") || CommandLineContains(event, "-encodedcommand")) {
-            return true;
-        }
-        return false;
-    }
-    return false;
-}
-bool AutostartWrite(const Event& event){
-    if(IsFileWrite(event) || IsFileCreate(event)){
-        const std::string& s = GetRequiredField(event, "path");
-        if(StrContains(s, "\\start menu\\programs\\startup\\")){
-            return true;
-        }
-        return false;
-    }
-    if(IsFileMove(event)){
-        const std::string& s = GetRequiredField(event, "to");
-        if(StrContains(s, "\\start menu\\programs\\startup\\")){
-            return true;
-        }
-        return false;
-    }
-    return false;
-}
-bool RansomExtension(const Event& event){
-    if(IsFileWrite(event) || IsFileCreate(event)){
-        const std::string& s = GetRequiredField(event, "path");
-        if(StrEndsWith(s, ".locked")){
-            return true;
-        }
-        return false;
-    }
-    if(IsFileMove(event)){
-        const std::string& s = GetRequiredField(event, "to");
-        if(StrEndsWith(s, ".locked")){
-            return true;
-        }
-        return false;
-    }
-    return false;
-}
-constexpr Rule kRules[] = {
-    {"script_host_from_temp", ScriptHostFromTemp, Severity::kHigh},
-    {"lolbin_download",       LolbinDownload,     Severity::kHigh},
-    {"hidden_powershell",     HiddenPowershell,   Severity::kMedium},
-    {"autostart_write",       AutostartWrite,     Severity::kHigh},
-    {"ransom_extension",      RansomExtension,    Severity::kCritical},
-};
-const Rule* AgentRules(){
-    return kRules;
-}
-size_t AgentRuleCount(){
-    return sizeof(kRules) / sizeof(kRules[0]);
-}
 }

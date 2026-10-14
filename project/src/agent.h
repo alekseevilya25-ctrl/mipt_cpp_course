@@ -7,6 +7,7 @@
 
 #include "os.h"
 #include "event_list.h"
+#include "rule.h"
 
 class Agent {
 public:
@@ -32,6 +33,7 @@ private:
     std::vector<std::string> type_names_;
     std::vector<long long> type_counts_;
     nano_edr::EventList window_;
+    std::vector<nano_edr::MatchRule> rules_;
 };
 
 #endif  // NANO_EDR_AGENT_H
