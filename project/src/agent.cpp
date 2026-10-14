@@ -9,13 +9,16 @@
 #include "event_list.h"
 #include "rules.h"
 
-Agent::Agent(std::size_t window_size, bool quiet): window_(window_size), quiet_(quiet){}
+Agent::Agent(std::size_t window_size, bool quiet): window_(window_size), quiet_(quiet), rules_(nano_edr::BuildAgentRules()){}
 
 void Agent::HandleEvent(const nano_edr::Event& event){
     ++events_;
     Typecnt(event.type());
-    nano_edr::CheckRules(event, nano_edr::AgentRules(), nano_edr::AgentRuleCount());
-
+    for (auto& rule : rules_){
+        if(rule.Check(event)){
+            std::print("[DETECT] {}  {}  ts={} pid={}\n", SeverityName(rule.severity()), rule.id(), event.raw_ts(), event.pid());
+        }
+    }
     window_.PushBack(event);
 }
 
@@ -48,11 +51,15 @@ void Agent::Typecnt(const std::string& type){
     type_counts_.push_back(1);
 }
 
-void Agent::PrintSummary() const{
+void Agent::PrintSummary() const {
     if (!quiet_) {
         std::print("строк {}, из них комментариев {}, событий {}\n", lines_, comments_, events_);
         for (std::size_t j = 0; j < type_names_.size(); ++j) {
             std::print("  {}: {}\n", type_names_[j], type_counts_[j]);
+        }
+        std::print("\nправила, детектов:\n");
+        for (const auto& rule : rules_) {
+            std::print("{} {}\n", rule.id(), rule.hits());
         }
     }
 }

@@ -1,9 +1,10 @@
 #include "fields.h"
+#include "text.h"
 #include <stdexcept>
 #include <charconv>
+
 namespace nano_edr{
-// nullptr, а не исключение: у file_write нет поля domain, и спрашивать
-// про него законно.
+
 const std::string* FindField(const Event& event, const std::string& key){
     if (key == "ts"){
         return &event.raw_ts();
@@ -21,8 +22,7 @@ const std::string* FindField(const Event& event, const std::string& key){
     }
     return nullptr;
 }
-//throw std::invalid_argument: отсутствие обязательного поля
-//без которого дальше идти некуда
+
 const std::string& GetRequiredField(const Event& event, const std::string& key){
     const std::string* value = FindField(event, key);
     if (!value){
@@ -94,11 +94,7 @@ bool PathEndsWith(const Event& event, const std::string& suffix){
     }
     std::string npath = NormalizePath(*path);
     std::string nsuffix = NormalizePath(suffix);
-    if (nsuffix.size() > npath.size()){
-        return false;
-    }
-    size_t pos = npath.size() - nsuffix.size();
-    return npath.find(nsuffix, pos) == pos;
+    return TextEndsWith(npath, nsuffix);
 }
 
 bool CommandLineContains(const Event& event, const std::string& needle){
@@ -108,6 +104,6 @@ bool CommandLineContains(const Event& event, const std::string& needle){
     }
     std::string cmd_ = NormalizePath(*cmd);
     std::string needle_ = NormalizePath(needle);
-    return cmd_.find(needle_) != std::string::npos;
+    return TextContains(cmd_, needle_);
 }
 }
