@@ -6,15 +6,13 @@ namespace nano_edr {
 
 Event::Event(const EventParts& parts): raw_ts_(parts.ts), type_(parts.type), pid_(parts.pid), fields_(parts.fields) {
     const std::string& ts = parts.ts;
-    uint64_t n = 0;
-    auto [ptr, ec] = std::from_chars(ts.data(), ts.data() + ts.size(), n);
+    auto [ptr, ec] = std::from_chars(ts.data(), ts.data() + ts.size(), ts_.ms);
     if (ec != std::errc{} || ptr != ts.data() + ts.size()) {
         throw std::invalid_argument("неверное время события: " + ts);
     }
     if(parts.type.empty()){
         throw std::invalid_argument("отсутствует тип события");
     }
-    ts_.ms = n;
 }
 
 std::string ToString(const Event& event){
