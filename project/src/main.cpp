@@ -67,12 +67,12 @@ int main(int argc, char** argv) {
         if (!ParseArgs(argc, argv, path, quiet, window_size, use_file)){
             return 2;
         }
-        Agent agent(window_size, quiet);
+        nano_edr::Agent agent(window_size, quiet);
         if (use_file){
-            FileSource(path).Run(&agent);
+            nano_edr::FileSource(path).Run(&agent);
         }
         else{
-            OsSource(path).Run(&agent);
+            nano_edr::OsSource(path).Run(&agent);
         }
         agent.PrintSummary();
     }

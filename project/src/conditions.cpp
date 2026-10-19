@@ -4,6 +4,7 @@
 
 #include <vector>
 
+
 namespace nano_edr{
 
 bool FieldEquals::operator()(const Event& event) const {
@@ -49,32 +50,29 @@ Condition Condition::EndsWith(const std::string& key, const std::vector<std::str
     return Condition(Match::kEndsWith, key, values);
 }
 bool Condition::operator()(const Event& event) const {
-    const std::string* value = FindField(event, key_);
-    if (value == nullptr || values_.empty()){
+    if (values_.empty()){
         return false;
     }
-    switch (match_){
-    case Match::kEquals:
-        for (const auto& v : values_){
-            if (TextEquals(*value, v)){
-                return true;
-            }
-        }
+    const std::string* value = FindField(event, key_);
+    if (!value){
         return false;
-    case Match::kContains:
-        for (const auto& v : values_){
-            if (TextContains(*value, v)){
-                return true;
-            }
+    }
+    for (const auto& v : values_){
+        bool matched = false;
+        switch (match_){
+        case Match::kEquals:
+            matched = TextEquals(*value, v);
+            break;
+        case Match::kContains:
+            matched = TextContains(*value, v);
+            break;
+        case Match::kEndsWith:
+            matched = TextEndsWith(*value, v);
+            break;
         }
-        return false;
-    case Match::kEndsWith:
-        for (const auto& v : values_){
-            if (TextEndsWith(*value, v)){
-                return true;
-            }
+        if (matched){
+            return true;
         }
-        return false;
     }
     return false;
 }

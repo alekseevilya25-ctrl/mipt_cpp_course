@@ -10,26 +10,27 @@
 #include "event_list.h"
 #include "parse.h"
 
-FileSource::FileSource(const std::string& path_): path(path_){}
+namespace nano_edr{
 
-void FileSource::Run(Agent* agent){
-    std::ifstream log(path);
-    if (!log) {
+FileSource::FileSource(const std::string& path): log_(path){
+    if (!log_) {
         throw std::runtime_error("не удалось открыть журнал: " + path);
     }
+}
+
+void FileSource::Run(Agent* agent){
     std::string line;
-    while (std::getline(log, line)){
-        (agent)->IncLines();
-        if (nano_edr::IsBlankOrComment(line)){
-            (agent)->IncComments();
-            continue;
-        }
-        nano_edr::EventParts parts;
-        if (!nano_edr::ParseEventParts(line, &parts)){
-            continue;
-        }
+    while (std::getline(log_, line)){
         try {
-            agent->HandleEvent(nano_edr::Event(parts));
+        if (IsBlankOrComment(line)){
+            continue;
+        }
+        EventParts parts;
+        if (!ParseEventParts(line, &parts)){
+            continue;
+        }
+
+        agent->HandleEvent(Event(parts));
         }
         catch (const std::exception& e){
             std::print(stderr, "{}\n", e.what());
@@ -48,4 +49,6 @@ void OsSource::Run(Agent* agent){
     if (sts != OS_OK){
         throw std::runtime_error("Ошибка os_source.run" + std::string(os_status_str(sts)));
     }
+}
+
 }

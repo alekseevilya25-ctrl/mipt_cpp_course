@@ -2,9 +2,12 @@
 #define NANO_EDR_SOURCES_H
 
 #include <string>
+#include <fstream>
 
 #include "agent.h"
 #include "os_handle.h"
+
+namespace nano_edr{
 
 class FileSource{
 public:
@@ -12,7 +15,7 @@ public:
     void Run(Agent* agent);
 
 private:
-    std::string path;
+    std::ifstream log_;
 };
 
 class OsSource{
@@ -21,7 +24,8 @@ public:
     void Run(Agent* agent);
 
 private:
-    nano_edr::OsHandle h_;
+    OsHandle h_;
 };
 
+}
 #endif
