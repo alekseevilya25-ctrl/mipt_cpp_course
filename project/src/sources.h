@@ -4,24 +4,24 @@
 #include <string>
 #include <fstream>
 
-#include "agent.h"
 #include "os_handle.h"
 
 namespace nano_edr{
 
-class FileSource{
+class FileSource : public IEventSource{
 public:
     explicit FileSource(const std::string& path_);
-    void Run(Agent* agent);
+    void Run(IEventHandler* agent) override;
 
 private:
     std::ifstream log_;
 };
 
-class OsSource{
+class OsSource : public IEventSource{
 public:
     explicit OsSource(const std::string& config_path);
-    void Run(Agent* agent);
+    void Run(IEventHandler* agent) override;
+    static void Trampoline(const os_event* ev, void* ctx) noexcept;
 
 private:
     OsHandle h_;
