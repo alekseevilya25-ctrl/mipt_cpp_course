@@ -4,7 +4,7 @@
 #include <stdexcept>
 namespace nano_edr {
 
-Event::Event(const EventParts& parts): raw_ts_(parts.ts), type_(parts.type), pid_(parts.pid), fields_(parts.fields) {
+Event::Event(const EventParts& parts): raw_ts_(parts.ts), type_(parts.type), pid_(parts.pid), fields_(parts.fields), event_type_(EventTypeFromString(parts.type)) {
     const std::string& ts = parts.ts;
     auto [ptr, ec] = std::from_chars(ts.data(), ts.data() + ts.size(), ts_.ms);
     if (ec != std::errc{} || ptr != ts.data() + ts.size()) {
@@ -31,5 +31,16 @@ std::string ToString(const Event& event){
 
 std::ostream& operator<<(std::ostream& out, const Event& event){
     return out << ToString(event);
+}
+
+EventType EventTypeFromString(const std::string& type){
+    if(type == "process_start") return EventType::kProcessStart;
+    if(type == "process_end") return EventType::kProcessEnd;
+    if(type == "file_create") return EventType::kFileCreate;
+    if(type == "file_write") return EventType::kFileWrite;
+    if(type == "file_delete") return EventType::kFileDelete;
+    if(type == "file_move") return EventType::kFileMove;
+    if(type == "net_connect") return EventType::kNetConnect;
+    return EventType::kOther;
 }
 }
