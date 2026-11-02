@@ -1,6 +1,8 @@
 #include "agent_rules.h"
-#include "rule_engine.h"
+
 #include <memory>
+
+#include "rule_engine.h"
 
 namespace nano_edr{
 
