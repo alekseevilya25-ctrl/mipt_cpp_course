@@ -10,12 +10,19 @@
 #include "event_source.h"
 #include "rule.h"
 #include "rule_engine.h"
+#include "ring_buffer.h"
 
 namespace nano_edr{
 
+struct WindowEntry {
+    Timestamp ts;
+    std::string type;
+    std::string pid;
+};
+
 class Agent : public IEventHandler {
 public:
-    Agent(std::size_t window_size, bool quiet);
+    explicit Agent(bool quiet);
 
     void PrintSummary() const;
 
@@ -32,6 +39,8 @@ public:
     // OsSource: Wait вернул OS_TIMEOUT, новых событий пока нет.
     void OnTick() override;
     // ...
+    static constexpr std::size_t kWindowCapacity = 256;
+
 private:
     void Typecnt(const std::string& type);
 
@@ -41,11 +50,10 @@ private:
     long long events_ = 0;
     std::vector<std::string> type_names_;
     std::vector<long long> type_counts_;
-    EventList window_;
+    RingBuffer<WindowEntry, kWindowCapacity> window_;
     RuleEngine engine_;
     long long skipped_ = 0;
     long long broken_ = 0;
-    const EventNode* ctx_ = nullptr;
 };
 
 }
