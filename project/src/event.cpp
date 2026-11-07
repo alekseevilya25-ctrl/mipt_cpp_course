@@ -4,7 +4,7 @@
 #include <stdexcept>
 namespace nano_edr {
 
-Event::Event(const EventParts& parts): raw_ts_(parts.ts), type_(parts.type), pid_(parts.pid), fields_(parts.fields), event_type_(EventTypeFromString(parts.type)) {
+Event::Event(const EventParts& parts): raw_ts_(parts.ts), type_(parts.type), event_type_(EventTypeFromString(parts.type)), pid_(parts.pid), fields_(parts.fields) {
     const std::string& ts = parts.ts;
     auto [ptr, ec] = std::from_chars(ts.data(), ts.data() + ts.size(), ts_.ms);
     if (ec != std::errc{} || ptr != ts.data() + ts.size()) {

@@ -5,7 +5,6 @@
 #include <fstream>
 
 #include "os_handle.h"
-#include "event_source.h"
 
 namespace nano_edr{
 
