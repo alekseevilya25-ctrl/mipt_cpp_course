@@ -7,7 +7,7 @@
 #include "sources.h"
 
 void Error(){
-    std::print(stderr, "использование: nano-edr <журнал.log> [--quiet] [--window-size N]\n");
+    std::print(stderr, "использование: nano-edr <журнал.log> [--quiet]\n");
 }
 
 bool ParseArgs(int argc, char** argv, std::string& path, bool& quiet, bool& use_file){

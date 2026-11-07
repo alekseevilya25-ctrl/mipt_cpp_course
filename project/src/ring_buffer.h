@@ -28,9 +28,9 @@ class RingBuffer {
         }
 
      private:
-        const RingBuffer* buffer_;
-        std::size_t index_;
-        std::size_t remaining_;
+        const RingBuffer* buffer_ = nullptr;
+        std::size_t index_ = 0;
+        std::size_t remaining_ = 0;
     };
 
     void PushBack(const T& value){
@@ -86,7 +86,7 @@ class RingBuffer {
     }
 
  private:
-    std::array<T, N> c_{};
+    std::array<T, N> c_;
     std::size_t index_ = 0;
     bool is_full_ = false;
 };
