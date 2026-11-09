@@ -3,7 +3,7 @@
 
 #include <string>
 #include <fstream>
-
+#include "event_source.h"
 #include "os_handle.h"
 
 namespace nano_edr{
