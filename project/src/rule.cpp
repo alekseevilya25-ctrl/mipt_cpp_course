@@ -1,5 +1,5 @@
 #include "rule.h"
-
+#include <print>
 namespace nano_edr{
 
 RuleBase::RuleBase(const std::string& id, Severity severity): id_(id), severity_(severity){}
@@ -34,6 +34,23 @@ void SequenceRule::SetSecond(std::unique_ptr<ICondition> condition){
     second_ = std::move(condition);
 }
 
+bool SequenceRule::Linked(const Pending& first, const Event& second) const {
+    if (child_of_prev_){
+        if (model_ == nullptr){
+            return false;
+        }
+        const ProcessRecord* record = model_->FindProcess(second.pid());
+        if (record == nullptr){
+            return false;
+        }
+        return record->ppid == first.pid;
+    }
+    if (same_pid_){
+        return first.pid == second.pid();
+    }
+    return true;
+}
+
 bool SequenceRule::Check(const Event& event){
     if (!first_ || !second_){
         return false;
@@ -47,7 +64,7 @@ bool SequenceRule::Check(const Event& event){
     pending_ = std::move(newpend);
     if (second_->Matches(event)){
         for (std::size_t i = 0; i < pending(); i++){
-            if (!same_pid_ || pending_[i].pid == event.pid()){
+            if (Linked(pending_[i], event)){
                 pending_.erase(pending_.begin() + i);
                 CountHit();
                 return true;
@@ -61,5 +78,18 @@ bool SequenceRule::Check(const Event& event){
         pending_.push_back(p);
     }
     return false;
+}
+
+LambdaRule::LambdaRule(const std::string& id, Severity severity, Predicate predicate): RuleBase(id, severity), predicate_(std::move(predicate)) {}
+
+bool LambdaRule::Check(const Event& event) {
+    if (!predicate_) {
+        return false;
+    }
+    if (!predicate_(event)) {
+        return false;
+    }
+    CountHit();
+    return true;
 }
 }

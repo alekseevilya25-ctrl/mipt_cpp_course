@@ -5,17 +5,27 @@
 
 #include "agent.h"
 #include "sources.h"
+#include "alert_sink.h"
+#include "edr_handle.h"
+#include "field_traits.h"
 
 void Error(){
     std::print(stderr, "использование: nano-edr <журнал.log> [--quiet]\n");
 }
 
-bool ParseArgs(int argc, char** argv, std::string& path, bool& quiet, bool& use_file){
+bool ParseArgs(int argc, char** argv, std::string& path, bool& quiet, bool& use_file, std::string& out){
     int pathcnt = 0;
     for (int i = 1; i < argc; i++){
         std::string arg = std::string(argv[i]);
         if (arg == "--quiet"){
             quiet = true;
+        }
+        else if (arg == "--out"){
+            if (i + 1 == argc){
+                Error();
+                return false;
+            }
+            out = argv[++i];
         }
         else if (arg == "--file"){
             use_file = true;
@@ -46,12 +56,33 @@ bool ParseArgs(int argc, char** argv, std::string& path, bool& quiet, bool& use_
 int main(int argc, char** argv) {
     try{
         bool quiet = false;
+        std::string out;
         std::string path;
         bool use_file = false;
-        if (!ParseArgs(argc, argv, path, quiet, use_file)){
+
+        if (!ParseArgs(argc, argv, path, quiet, use_file, out)){
             return 2;
         }
-        nano_edr::Agent agent(quiet);
+
+        nano_edr::EdrHandle edr(path);
+        const std::string text = edr.Config("dedup_period_ms", "10000");
+        uint64_t dedup_period_ms = 0;
+        if (!nano_edr::FieldTraits<uint64_t>::Parse(text, &dedup_period_ms)) {
+            std::print(stderr, "[WARN] dedup_period_ms не разбирается: {}\n", text);
+            dedup_period_ms = 10000;
+        }
+        nano_edr::Agent agent(quiet, dedup_period_ms);
+        nano_edr::FanOutSink targets;
+
+        targets.Add(nano_edr::ConsoleSink());
+        targets.Add(nano_edr::EdrSink(&edr));
+
+        if (!out.empty()) {
+            targets.Add(nano_edr::FileSink(out));
+        }
+
+        agent.Subscribe(std::move(targets));
+
         std::unique_ptr<nano_edr::IEventSource> source;
         if (use_file) {
             source = std::make_unique<nano_edr::FileSource>(path);
@@ -60,6 +91,9 @@ int main(int argc, char** argv) {
             source = std::make_unique<nano_edr::OsSource>(path);
         }
         source->Run(&agent);
+        if (edr.Flush() != EDR_OK) {
+            std::print(stderr, "[WARN] детекты не отправлены\n");
+        }
         agent.PrintSummary();
     }
     catch (const std::exception& error){

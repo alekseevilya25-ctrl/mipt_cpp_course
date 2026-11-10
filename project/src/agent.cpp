@@ -8,24 +8,21 @@
 #include "event.h"
 #include "event_list.h"
 #include "rules.h"
+#include "dedup_sink.h"
 
 namespace nano_edr{
 
-Agent::Agent(bool quiet): quiet_(quiet), engine_(BuildAgentRules()){}
+Agent::Agent(bool quiet, uint64_t dedup_period_ms): quiet_(quiet), engine_(BuildAgentRules(&model_)), dedup_period_ms_(dedup_period_ms){
+    engine_.SetModel(&model_);
+}
 
 void Agent::HandleEvent(const Event& event){
     ++events_;
     Typecnt(event.type());
-
+    context_printed_ = false;
     std::vector<const IRule*> fired;
+    model_.Observe(event);
     engine_.ProcessEvent(event, &fired);
-    if (!fired.empty() && !quiet_) {
-        Context();
-    }
-    for (auto rule : fired){
-        std::print("[DETECT] {}  {}  ts={} pid={}\n", SeverityName(rule->severity()), rule->id(), event.raw_ts(), event.pid());
-    }
-
     WindowEntry entry;
     entry.ts = event.ts();
     entry.type = event.type();
@@ -43,6 +40,14 @@ void Agent::Typecnt(const std::string& type){
     type_names_.push_back(type);
     type_counts_.push_back(1);
 }
+
+void Agent::PrintContextOnce() {
+    if (quiet_) return;
+    if (context_printed_) return;
+    context_printed_ = true;
+    Context();
+}
+
 void Agent::Context() const {
     const std::size_t n = window_.size();
     if (n == 0){
@@ -62,11 +67,20 @@ void Agent::PrintSummary() const {
             std::print("  {}: {}\n", type_names_[j], type_counts_[j]);
         }
         std::print("[STAT] в окне {} из {} мест\n", window_.size(), window_.capacity());
+        std::print("[STAT] в модели процессов {}, файлов {}\n", model_.process_count(), model_.file_count());
+        std::print("[STAT] подавлено дубликатов {} (срок {} мс)\n", suppressed_, dedup_period_ms_);
         std::print("\nправила, детектов:\n");
         for (std::size_t j = 0; j < engine_.size(); ++j) {
             std::print("{} {}\n", engine_.rule(j).id(), engine_.rule(j).hits());
         }
     }
+}
+
+void Agent::Subscribe(AlertSink sink) {
+    FanOutSink all;
+    all.Add([this](const Detection&) { PrintContextOnce(); });
+    all.Add(std::move(sink));
+    engine_.Subscribe(DedupSink(std::move(all), dedup_period_ms_, &suppressed_));
 }
 
 void Agent::OnSkipped(){
