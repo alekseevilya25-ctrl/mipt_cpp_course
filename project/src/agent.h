@@ -11,6 +11,7 @@
 #include "rule.h"
 #include "rule_engine.h"
 #include "ring_buffer.h"
+#include "alert_sink.h"
 
 namespace nano_edr{
 
@@ -22,7 +23,7 @@ struct WindowEntry {
 
 class Agent : public IEventHandler {
 public:
-    explicit Agent(bool quiet);
+    explicit Agent(bool quiet, uint64_t dedup_period_ms);
 
     void PrintSummary() const;
 
@@ -39,6 +40,7 @@ public:
     // OsSource: Wait вернул OS_TIMEOUT, новых событий пока нет.
     void OnTick() override;
     // ...
+    void Subscribe(AlertSink sink);
     static constexpr std::size_t kWindowCapacity = 256;
 
 private:
@@ -46,14 +48,20 @@ private:
 
     void Context() const;
 
+    void PrintContextOnce();
+    bool context_printed_ = false;
     bool quiet_ = false;
     long long events_ = 0;
     std::vector<std::string> type_names_;
     std::vector<long long> type_counts_;
     RingBuffer<WindowEntry, kWindowCapacity> window_;
+    EntityModel model_;
     RuleEngine engine_;
     long long skipped_ = 0;
     long long broken_ = 0;
+
+    uint64_t dedup_period_ms_{};
+    std::size_t suppressed_{};
 };
 
 }
