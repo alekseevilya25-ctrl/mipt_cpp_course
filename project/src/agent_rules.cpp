@@ -16,7 +16,8 @@ RuleEngine BuildAgentRules(const EntityModel* model){
     paths1->Add(std::make_unique<FieldEndsWith>("to", ".locked"));
     rule1->AddCondition(std::move(paths1));
 
-    rule1->AddAction("quarantine_file");
+    rule1->AddAction("kill_process");
+    rule1->AddAction("quarantine_image");
     engine.AddRule(std::move(rule1));
 
     auto rule2 = std::make_unique<MatchRule>("script_host_from_temp", Severity::kHigh);
@@ -37,6 +38,8 @@ RuleEngine BuildAgentRules(const EntityModel* model){
     rule2->AddCondition(std::move(cmd2));
     
     rule2->AddAction("kill_process");
+    rule2->AddAction("quarantine_source");
+    rule2->AddAction("delete_dropped");
     engine.AddRule(std::move(rule2));
 
     auto rule3 = std::make_unique<MatchRule>("lolbin_download", Severity::kHigh);
@@ -85,7 +88,7 @@ RuleEngine BuildAgentRules(const EntityModel* model){
     paths5->Add(std::make_unique<FieldContains>("to", "/start menu/programs/startup/"));
     rule5->AddCondition(std::move(paths5));
     
-    rule5->AddAction("quarantine_file");
+    rule5->AddAction("delete_evidence");
     engine.AddRule(std::move(rule5));
 
     auto rule6 = std::make_unique<SequenceRule>("script_host_beacon", Severity::kCritical, 10000);
@@ -117,7 +120,7 @@ RuleEngine BuildAgentRules(const EntityModel* model){
     mass_write->SetCondition(MakeCondition(AllOfStatic(EventTypeIs({EventType::kFileCreate, EventType::kFileWrite, EventType::kFileMove}), AnyOfStatic(FieldContains("path", "\\Documents\\"), FieldContains("path", "\\Desktop\\"), FieldContains("to",   "\\Documents\\"), FieldContains("to",   "\\Desktop\\")))));
 
     mass_write->AddAction("kill_process");
-    mass_write->AddAction("quarantine_file");
+    mass_write->AddAction("quarantine_image");
     engine.AddRule(std::move(mass_write)); 
     
     auto shell = MakeRule<SequenceRule>("shell_spawns_script_host", Severity::kHigh, 30000);
@@ -167,7 +170,8 @@ RuleEngine BuildAgentRules(const EntityModel* model){
             return true;
         });
     dropped->AddAction("kill_process");
-    dropped->AddAction("quarantine_file");
+    dropped->AddAction("quarantine_source");
+    dropped->AddAction("delete_dropped");
     engine.AddRule(std::move(dropped));
 
     return engine;
