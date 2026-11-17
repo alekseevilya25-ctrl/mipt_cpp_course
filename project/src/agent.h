@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <string>
 #include <vector>
+#include <memory>
 
 #include "event.h"
 #include "event_list.h"
@@ -12,14 +13,10 @@
 #include "rule_engine.h"
 #include "ring_buffer.h"
 #include "alert_sink.h"
+#include "window_entry.h"
+#include "response.h"
 
 namespace nano_edr{
-
-struct WindowEntry {
-    Timestamp ts;
-    std::string type;
-    std::string pid;
-};
 
 class Agent : public IEventHandler {
 public:
@@ -41,6 +38,9 @@ public:
     void OnTick() override;
     // ...
     void Subscribe(AlertSink sink);
+
+    void EnableResponse(OsHandle* os, bool dry_run, const std::string& quarantine_dir);
+
     static constexpr std::size_t kWindowCapacity = 256;
 
 private:
@@ -59,6 +59,9 @@ private:
     RuleEngine engine_;
     long long skipped_ = 0;
     long long broken_ = 0;
+
+    std::unique_ptr<ResponsePlanner> planner_{};
+    std::unique_ptr<Responder> responder_{};
 
     uint64_t dedup_period_ms_{};
     std::size_t suppressed_{};

@@ -5,6 +5,7 @@
 #include <print>
 #include <stdexcept>
 #include <string>
+#include <utility>
 
 #include "event.h"
 #include "event_list.h"
@@ -32,7 +33,7 @@ void FileSource::Run(IEventHandler* handler){
             continue;
         }
 
-        handler->HandleEvent(Event(parts));
+        handler->HandleEvent(Event(std::move(parts)));
         }
         catch (const std::exception& e){
             handler->OnBroken();
@@ -68,7 +69,7 @@ void OsSource::Trampoline(const os_event* ev, void* ctx) noexcept{
         parts.ts = std::to_string(ev->ts);
         parts.type = ev->type;
         parts.pid = ev->pid == 0 ? "" : std::to_string(ev->pid);
-        handler->HandleEvent(Event(parts));
+        handler->HandleEvent(Event(std::move(parts)));
     }
     catch (const std::exception& e) {
         handler->OnBroken();

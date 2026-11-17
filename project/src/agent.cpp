@@ -3,6 +3,7 @@
 #include <print>
 #include <string>
 #include <vector>
+#include <utility>
 
 #include "agent_rules.h"
 #include "event.h"
@@ -22,12 +23,20 @@ void Agent::HandleEvent(const Event& event){
     context_printed_ = false;
     std::vector<const IRule*> fired;
     model_.Observe(event);
+    if (responder_ != nullptr && responder_->Recognize(event)) {
+        WindowEntry entry;
+        entry.ts = event.ts();
+        entry.type = event.type();
+        entry.pid = event.pid();
+        window_.PushBack(std::move(entry));
+        return;
+    }
     engine_.ProcessEvent(event, &fired);
     WindowEntry entry;
     entry.ts = event.ts();
     entry.type = event.type();
     entry.pid = event.pid();
-    window_.PushBack(entry);
+    window_.PushBack(std::move(entry));
 }
 
 void Agent::Typecnt(const std::string& type){
@@ -69,6 +78,14 @@ void Agent::PrintSummary() const {
         std::print("[STAT] в окне {} из {} мест\n", window_.size(), window_.capacity());
         std::print("[STAT] в модели процессов {}, файлов {}\n", model_.process_count(), model_.file_count());
         std::print("[STAT] подавлено дубликатов {} (срок {} мс)\n", suppressed_, dedup_period_ms_);
+        if (responder_ != nullptr) {
+            const auto& s = responder_->stats();
+            std::print("[STAT] действий запланировано {}, повторов отброшено {}\n", s.planned, s.skipped_repeat);
+            std::print("[STAT] завершено процессов {}, изолировано файлов {}, удалено файлов {}\n", s.killed, s.quarantined, s.deleted);
+        if (s.own_events > 0) {
+            std::print("[STAT] своих событий {}\n", s.own_events);
+        }
+}
         std::print("\nправила, детектов:\n");
         for (std::size_t j = 0; j < engine_.size(); ++j) {
             std::print("{} {}\n", engine_.rule(j).id(), engine_.rule(j).hits());
@@ -91,4 +108,13 @@ void Agent::OnBroken(){
 }
 void Agent::OnTick(){
 }
+
+void Agent::EnableResponse(OsHandle* os, bool dry_run, const std::string& quarantine_dir) {
+    planner_ = std::make_unique<ResponsePlanner>(&model_, quarantine_dir);
+    responder_ = std::make_unique<Responder>(os, dry_run);
+    engine_.Subscribe([this](const Detection& detection) {
+        responder_->Execute(planner_->Plan(detection));
+    });
+}
+
 }

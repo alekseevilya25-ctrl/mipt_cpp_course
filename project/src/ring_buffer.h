@@ -3,6 +3,7 @@
 
 #include <array>
 #include <cstddef>
+#include <utility>
 
 namespace nano_edr {
 
@@ -35,6 +36,14 @@ class RingBuffer {
 
     void PushBack(const T& value){
         c_[index_] = value;
+        index_ = (index_ + 1) % N;
+        if (index_ == 0){
+            is_full_ = true;
+        }
+    }
+
+    void PushBack(T&& value){
+        c_[index_] = std::move(value);
         index_ = (index_ + 1) % N;
         if (index_ == 0){
             is_full_ = true;

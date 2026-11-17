@@ -22,7 +22,7 @@ public:
     explicit OsSource(const std::string& config_path);
     void Run(IEventHandler* agent) override;
     static void Trampoline(const os_event* ev, void* ctx) noexcept;
-
+    OsHandle* os() override { return &h_; }
 private:
     OsHandle h_;
 };
