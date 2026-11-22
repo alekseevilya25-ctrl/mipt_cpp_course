@@ -8,12 +8,13 @@
 #include "alert_sink.h"
 #include "edr_handle.h"
 #include "field_traits.h"
+#include "copy_stats.h"
 
 void Error(){
-    std::print(stderr, "использование: nano-edr <журнал.log> [--quiet]\n");
+    std::print(stderr, "использование: nano-edr <журнал.log> [--quiet] [--copies] [--dry-run]\n");
 }
 
-bool ParseArgs(int argc, char** argv, std::string& path, bool& quiet, bool& use_file, std::string& out){
+bool ParseArgs(int argc, char** argv, std::string& path, bool& quiet, bool& use_file, std::string& out, bool& copies, bool& dry_run){
     int pathcnt = 0;
     for (int i = 1; i < argc; i++){
         std::string arg = std::string(argv[i]);
@@ -35,6 +36,12 @@ bool ParseArgs(int argc, char** argv, std::string& path, bool& quiet, bool& use_
             }
             path = argv[++i];
             pathcnt++;
+        }
+        else if (arg == "--copies"){
+            copies = true;
+        }
+        else if (arg == "--dry-run"){
+            dry_run = true;
         }
         else if (arg[0] == '-'){
             Error();
@@ -59,8 +66,10 @@ int main(int argc, char** argv) {
         std::string out;
         std::string path;
         bool use_file = false;
+        bool copies = false;
+        bool dry_run = false;
 
-        if (!ParseArgs(argc, argv, path, quiet, use_file, out)){
+        if (!ParseArgs(argc, argv, path, quiet, use_file, out, copies, dry_run)){
             return 2;
         }
 
@@ -90,11 +99,22 @@ int main(int argc, char** argv) {
         else {
             source = std::make_unique<nano_edr::OsSource>(path);
         }
+
+        agent.EnableResponse(source->os(), dry_run, edr.Config("quarantine_dir", "C:\\quarantine"));
+        
         source->Run(&agent);
         if (edr.Flush() != EDR_OK) {
             std::print(stderr, "[WARN] детекты не отправлены\n");
         }
         agent.PrintSummary();
+        
+        if (copies){
+            const auto& s = nano_edr::copy_stats();
+            std::print("[COPY] строк события скопировано {}, перемещено {}\n", s.event_strings_copied, s.event_strings_moved);
+            std::print("[COPY] записей WindowEntry скопировано {}, перемещено {}\n", s.window_copied, s.window_moved);
+            std::print("[COPY] событий скопировано в детекты {}\n", s.evidence_copied);
+            std::print("[COPY] копий всего {}\n", s.total());
+        }
     }
     catch (const std::exception& error){
         std::print(stderr, "ошибка: {}\n", error.what());
